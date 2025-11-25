@@ -1,0 +1,593 @@
+================================================================================
+                    NEWSFLOW - NEWS RECOMMENDATION SYSTEM
+                          TECHNICAL DOCUMENTATION
+================================================================================
+
+PROJECT OVERVIEW
+================================================================================
+
+NewsFlow is a personalized news recommendation system that uses machine learning
+algorithms to suggest relevant articles based on user reading history. The system
+integrates real-time news scraping from OnlineKhabar (Nepal's #1 news portal) and
+employs content-based filtering techniques to provide personalized recommendations.
+
+Technology Stack:
+- Backend: Python 3.9+ with FastAPI
+- Frontend: React (Vite)
+- ML Library: scikit-learn
+- Web Scraping: BeautifulSoup4, requests
+- UI: Vanilla CSS with modern dark mode design
+
+
+SYSTEM ARCHITECTURE
+================================================================================
+
+The system follows a client-server architecture with three main components:
+
+1. BACKEND (Python/FastAPI)
+   - REST API server exposing endpoints for articles and recommendations
+   - News scraping module for real-time data from OnlineKhabar
+   - TF-IDF based recommendation engine
+   - Caching mechanism for performance optimization
+
+2. FRONTEND (React)
+   - Single Page Application (SPA)
+   - Responsive grid layout for article display
+   - Interactive UI for marking articles as read
+   - Real-time recommendation updates
+
+3. DATA LAYER
+   - In-memory article storage with caching
+   - Fallback to mock data when scraping fails
+   - Support for both English and Nepali content
+
+
+CORE ALGORITHMS
+================================================================================
+
+1. TF-IDF (Term Frequency-Inverse Document Frequency)
+   -------------------------------------------------------
+   
+   Purpose: Convert article text into numerical feature vectors
+   
+   How it works:
+   
+   a) Term Frequency (TF):
+      - Measures how often a word appears in an article
+      - Formula: TF(word, article) = (frequency of word in article) / 
+                                      (total words in article)
+   
+   b) Inverse Document Frequency (IDF):
+      - Measures how unique/important a word is across all articles
+      - Formula: IDF(word) = log(total articles / articles containing word)
+   
+   c) TF-IDF Score:
+      - Combines TF and IDF to weight each word
+      - Formula: TF-IDF = TF × IDF
+      - High score = word is frequent in this article but rare overall
+      - Low score = common word (like "the", "is") or rare in this article
+   
+   Example:
+   - Word "NASA" in article about space:
+     TF = High (appears many times)
+     IDF = Medium (appears in some articles)
+     TF-IDF = High (important keyword)
+   
+   - Word "the" in any article:
+     TF = Low (common word)
+     IDF = Very Low (appears in all articles)
+     TF-IDF = Very Low (not important)
+
+2. COSINE SIMILARITY
+   -------------------------------------------------------
+   
+   Purpose: Measure similarity between articles or user profile and articles
+   
+   How it works:
+   
+   a) Vector Representation:
+      - Each article is represented as a vector in high-dimensional space
+      - Each dimension represents a unique word's TF-IDF score
+   
+   b) Similarity Calculation:
+      - Calculates the cosine of the angle between two vectors
+      - Formula: cos(θ) = (A · B) / (||A|| × ||B||)
+        Where:
+        - A · B = dot product of vectors
+        - ||A|| = magnitude of vector A
+        - ||B|| = magnitude of vector B
+   
+   c) Score Range:
+      - 1.0 = Identical articles (0° angle)
+      - 0.5 = Moderately similar
+      - 0.0 = Completely different (90° angle)
+   
+   Example:
+   - Article A: "NASA launches Mars rover"
+   - Article B: "SpaceX Mars mission announced"
+   - Cosine Similarity ≈ 0.7-0.8 (high similarity due to space/Mars theme)
+
+
+RECOMMENDATION PROCESS
+================================================================================
+
+Step-by-Step Flow:
+
+1. USER READS ARTICLES
+   - User clicks on article cards to mark them as "read"
+   - Frontend tracks read article IDs in state
+   - Marked articles show dimmed appearance with "Read" badge
+
+2. CREATE USER PROFILE
+   - System retrieves TF-IDF vectors for all read articles
+   - Calculates mean (average) of these vectors
+   - Result: User profile vector representing user's interests
+   
+   Example:
+   If user reads 3 space-related articles:
+   - User profile will have high values for words: "NASA", "rocket", "space"
+   - Low values for unrelated topics
+
+3. CALCULATE SIMILARITIES
+   - Compute cosine similarity between user profile and ALL articles
+   - Exclude already read articles (similarity set to -1)
+   - Results in similarity scores for each unread article
+
+4. RANK AND RECOMMEND
+   - Sort articles by similarity score (highest to lowest)
+   - Select top N articles (default: 3)
+   - Return recommended articles to frontend
+
+5. DISPLAY RECOMMENDATIONS
+   - Frontend shows "Recommended for You" section at top
+   - Updates in real-time as user reads more articles
+   - The more articles read, the better the recommendations
+
+
+WEB SCRAPING PROCESS
+================================================================================
+
+OnlineKhabar Integration:
+
+1. SCRAPER INITIALIZATION
+   - Fetches homepage HTML from OnlineKhabar
+   - Uses respectful User-Agent header
+   - Implements 10-second timeout for reliability
+
+2. ARTICLE LINK EXTRACTION
+   - Parses HTML with BeautifulSoup4 (lxml parser)
+   - Identifies article links matching URL pattern: /2025/11/[article-id]
+   - Removes duplicates while preserving order
+   - Limits to 15-20 most recent articles
+
+3. ARTICLE DETAIL SCRAPING
+   For each article link:
+   
+   a) Fetch article page
+   b) Extract metadata:
+      - Title: From <h1 class="ok-single-title"> or meta og:title
+      - Category: From <a class="ok-post-category">
+      - Content: From <div class="ok-post-content"> paragraphs
+      - Image: From meta og:image
+      - URL: Original article link
+   
+   c) Map Nepali categories to English:
+      समाचार → News
+      बिजनेस → Business
+      खेलकुद → Sports
+      सूचना-प्रविधि → Technology
+      जीवनशैली → Lifestyle
+   
+   d) Rate limiting: 0.5 second delay between requests
+
+4. CACHING AND FALLBACK
+   - Articles cached in memory after first scrape
+   - Cache cleared on manual refresh or server restart
+   - Falls back to mock English data if scraping fails
+   - Graceful error handling for network issues
+
+
+SYSTEM USAGE
+================================================================================
+
+STARTING THE APPLICATION:
+
+1. Backend Server:
+   $ cd backend
+   $ source venv/bin/activate
+   $ python main.py
+   
+   Server starts at: http://localhost:8000
+
+2. Frontend Server:
+   $ cd frontend
+   $ npm run dev
+   
+   Server starts at: http://localhost:5173
+
+3. Access Application:
+   Open browser to: http://localhost:5173
+
+
+USER WORKFLOW:
+
+1. Browse Latest News
+   - Homepage displays all available articles
+   - Articles shown in responsive grid layout
+   - Each card shows: category badge, title, content preview
+
+2. Read Articles
+   - Click on any article card to mark as "read"
+   - Read articles appear dimmed with "Read" badge
+   - Click article title to open original source (OnlineKhabar)
+
+3. Get Recommendations
+   - After reading 1+ articles, "Recommended for You" section appears
+   - Shows 3 most relevant unread articles
+   - Recommendations update automatically as you read more
+
+4. Continue Reading
+   - The more articles you read, the better recommendations become
+   - System learns your preferences through reading patterns
+   - Mix reading different topics for diverse recommendations
+
+
+API ENDPOINTS
+================================================================================
+
+1. GET /
+   Description: Health check endpoint
+   Response: {"message": "News Recommendation API is running"}
+
+2. GET /articles
+   Description: Fetch all available articles
+   Response: Array of article objects
+   Example:
+   [
+     {
+       "id": 1,
+       "title": "किन झुण्ड्याइयो बाछोको घाँटीमा गह्रौं काठ ?",
+       "category": "News",
+       "content": "...",
+       "url": "https://www.onlinekhabar.com/...",
+       "image": "https://...",
+       "published_date": "2025-11-25T..."
+     }
+   ]
+
+3. POST /recommend
+   Description: Get personalized recommendations
+   Request Body: {"read_article_ids": [1, 2, 3]}
+   Response: Array of recommended article objects (max 3)
+
+4. GET /refresh-articles
+   Description: Force refresh articles from OnlineKhabar
+   Response: {"message": "Refreshed N articles", "count": N}
+
+
+DATA FLOW DIAGRAM
+================================================================================
+
+[User Browser]
+      |
+      | HTTP Request (GET /articles)
+      v
+[FastAPI Backend]
+      |
+      v
+[get_articles_data()]
+      |
+      +--> Check cache
+      |    |
+      |    +-- Cache exists? --> Return cached articles
+      |    |
+      |    +-- Cache empty? --> [Scraping Module]
+      |                              |
+      |                              v
+      |                        [fetch_articles()]
+      |                              |
+      |                              v
+      |                        [OnlineKhabar.com]
+      |                              |
+      |                              v
+      |                        Parse HTML, extract data
+      |                              |
+      |                              v
+      |                        Success? --> Cache & return
+      |                              |
+      |                              v
+      |                        Fail? --> Return mock data
+      v
+[TF-IDF Recommender]
+      |
+      v
+[User reads articles] --> [Create user profile]
+      |                           |
+      |                           v
+      |                  [Calculate cosine similarity]
+      |                           |
+      |                           v
+      |                  [Rank & filter top 3]
+      |                           |
+      v                           v
+[Display articles]      [Display recommendations]
+
+
+KEY FEATURES
+================================================================================
+
+1. CONTENT-BASED FILTERING
+   - No need for user accounts or historical data
+   - Recommendations based purely on content similarity
+   - Works immediately from first article read
+
+2. BILINGUAL SUPPORT
+   - Handles both English and Nepali (Devanagari) text
+   - TF-IDF algorithm works language-agnostically
+   - Proper Unicode rendering in modern browsers
+
+3. REAL-TIME SCRAPING
+   - Fresh news from OnlineKhabar on demand
+   - Automatic fallback ensures system always works
+   - Manual refresh capability via API
+
+4. RESPONSIVE DESIGN
+   - Mobile-friendly grid layout
+   - Dark mode optimized for reading
+   - Smooth animations and hover effects
+
+5. PERFORMANCE OPTIMIZATION
+   - Article caching reduces network requests
+   - Lazy TF-IDF computation on first recommendation
+   - Efficient vector operations with NumPy
+
+
+TECHNICAL IMPLEMENTATION DETAILS
+================================================================================
+
+1. BACKEND ARCHITECTURE
+
+   File: main.py
+   - FastAPI application with CORS middleware
+   - Global caching for articles and recommender instance
+   - Lazy initialization pattern for performance
+
+   File: recommender.py
+   - NewsRecommender class
+   - scikit-learn TfidfVectorizer with English stop words
+   - Pandas DataFrame for efficient data manipulation
+
+   File: scraper.py
+   - BeautifulSoup4 HTML parser
+   - Requests library for HTTP
+   - Robust error handling and logging
+
+   File: data.py
+   - Fallback mock articles
+   - Used when scraping fails
+
+2. FRONTEND ARCHITECTURE
+
+   File: App.jsx
+   - React hooks (useState, useEffect)
+   - Fetch API for backend communication
+   - Automatic recommendation refresh on state change
+
+   File: ArticleCard.jsx
+   - Reusable component for article display
+   - Handles clicks for marking as read
+   - Opens external links in new tabs
+
+   File: index.css
+   - CSS custom properties for theming
+   - CSS Grid for responsive layout
+   - Modern glassmorphism effects
+
+3. DEPENDENCIES
+
+   Backend (requirements.txt):
+   - fastapi: Modern web framework
+   - uvicorn: ASGI server
+   - scikit-learn: ML algorithms
+   - pandas: Data manipulation
+   - numpy: Numerical computing
+   - beautifulsoup4: HTML parsing
+   - requests: HTTP requests
+   - lxml: XML/HTML processing
+
+   Frontend (package.json):
+   - react: UI library
+   - vite: Build tool and dev server
+   - Standard React ecosystem packages
+
+
+CONFIGURATION
+================================================================================
+
+Backend Configuration:
+- Host: 0.0.0.0 (all interfaces)
+- Port: 8000
+- CORS Origins: http://localhost:5173
+- Max Articles to Scrape: 15-20
+- Top Recommendations: 3
+
+Frontend Configuration:
+- Dev Server Port: 5173
+- API Base URL: http://localhost:8000
+- Build Tool: Vite
+
+
+LIMITATIONS AND CONSIDERATIONS
+================================================================================
+
+1. COLD START PROBLEM
+   - No recommendations until user reads at least 1 article
+   - Solution: Clear "Latest News" section always available
+
+2. FILTER BUBBLE
+   - Reading similar articles leads to similar recommendations
+   - Solution: Users can manually explore different categories
+
+3. NEPALI STOP WORDS
+   - Current TF-IDF uses only English stop words
+   - Impact: Slightly less optimal for Nepali articles
+   - Future: Add Nepali stop words list
+
+4. NETWORK DEPENDENCY
+   - Scraping requires internet connection
+   - OnlineKhabar availability needed for fresh data
+   - Mitigation: Fallback mock data ensures system works offline
+
+5. SCALABILITY
+   - In-memory storage limits to ~100-200 articles
+   - For production: Use database (PostgreSQL, MongoDB)
+   - Current scope: Perfect for demo/educational purposes
+
+
+FUTURE ENHANCEMENTS
+================================================================================
+
+1. User Accounts
+   - Save reading history across sessions
+   - Personalized profiles
+   - Reading statistics
+
+2. Database Integration
+   - PostgreSQL for persistent storage
+   - Redis for caching
+   - Historical article archive
+
+3. Enhanced NLP
+   - Nepali stop words
+   - Named Entity Recognition
+   - Topic modeling (LDA)
+
+4. Additional Features
+   - Search functionality
+   - Category filtering
+   - Bookmarking articles
+   - Share articles on social media
+
+5. Multiple News Sources
+   - Integrate more Nepali news sites
+   - International news aggregation
+   - Source diversity in recommendations
+
+6. Advanced Algorithms
+   - Hybrid filtering (content + collaborative)
+   - Deep learning embeddings (BERT, Word2Vec)
+   - Popularity-based ranking
+
+7. Analytics Dashboard
+   - Reading time tracking
+   - Most popular articles
+   - Category preferences visualization
+
+
+TROUBLESHOOTING
+================================================================================
+
+Issue: Port already in use
+Solution: 
+$ lsof -t -i:8000 | xargs kill -9  # Backend
+$ lsof -t -i:5173 | xargs kill -9  # Frontend
+
+Issue: Scraping fails, only mock data shows
+Solution:
+- Check internet connection
+- Verify OnlineKhabar.com is accessible
+- Use /refresh-articles endpoint to retry
+- Check backend logs for errors
+
+Issue: Recommendations not appearing
+Solution:
+- Ensure you've clicked at least one article
+- Check browser console for errors
+- Verify backend /recommend endpoint works:
+  $ curl -X POST http://localhost:8000/recommend \
+    -H "Content-Type: application/json" \
+    -d '{"read_article_ids": [1, 2]}'
+
+Issue: Nepali text not displaying
+Solution:
+- Use modern browser (Chrome, Firefox, Safari)
+- Ensure browser supports Unicode/UTF-8
+- Clear browser cache and reload
+
+
+MATHEMATICAL FORMULAS REFERENCE
+================================================================================
+
+1. TF-IDF Calculation:
+   
+   TF(t,d) = count(t in d) / total_terms(d)
+   
+   IDF(t) = log(N / df(t))
+   where:
+   - N = total documents
+   - df(t) = documents containing term t
+   
+   TF-IDF(t,d) = TF(t,d) × IDF(t)
+
+2. Cosine Similarity:
+   
+   similarity(A, B) = cos(θ) = (A · B) / (||A|| × ||B||)
+   
+   where:
+   - A · B = Σ(Ai × Bi)  [dot product]
+   - ||A|| = √(Σ(Ai²))   [magnitude of A]
+   - ||B|| = √(Σ(Bi²))   [magnitude of B]
+
+3. User Profile:
+   
+   profile = (1/n) × Σ(article_vectors)
+   where n = number of read articles
+
+
+DEVELOPMENT SETUP REFERENCE
+================================================================================
+
+Initial Setup:
+
+1. Clone/Navigate to project:
+   $ cd /Users/suyoggautam/Personal/newsreco/project-
+
+2. Backend setup:
+   $ cd backend
+   $ python3 -m venv venv
+   $ source venv/bin/activate
+   $ pip install -r requirements.txt
+
+3. Frontend setup:
+   $ cd frontend
+   $ npm install
+
+Running Development Servers:
+
+Terminal 1 (Backend):
+$ cd backend
+$ source venv/bin/activate
+$ python main.py
+
+Terminal 2 (Frontend):
+$ cd frontend
+$ npm run dev
+
+
+CONCLUSION
+================================================================================
+
+NewsFlow demonstrates a practical implementation of content-based recommendation
+systems using TF-IDF and cosine similarity. The system successfully integrates
+real-time web scraping with machine learning algorithms to provide personalized
+news recommendations. 
+
+The architecture is modular, scalable, and serves as an excellent educational
+resource for understanding recommendation systems, natural language processing,
+and full-stack web development.
+
+For questions or contributions, refer to the codebase documentation and README.md
+
+================================================================================
+                            END OF DOCUMENTATION
+================================================================================
