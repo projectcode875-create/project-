@@ -1,11 +1,13 @@
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 import pandas as pd
+import numpy as np
 from data import ARTICLES
 
 class NewsRecommender:
-    def __init__(self):
-        self.articles = pd.DataFrame(ARTICLES)
+    def __init__(self, articles=None):
+        # Use provided articles or fallback to default ARTICLES
+        self.articles = pd.DataFrame(articles if articles is not None else ARTICLES)
         self.vectorizer = TfidfVectorizer(stop_words='english')
         self.tfidf_matrix = self.vectorizer.fit_transform(self.articles['content'])
 
@@ -21,6 +23,9 @@ class NewsRecommender:
 
         # Calculate mean vector of read articles (user profile)
         user_profile = self.tfidf_matrix[read_indices].mean(axis=0)
+        
+        # Convert to numpy array (required for newer scikit-learn versions)
+        user_profile = np.asarray(user_profile)
         
         # Calculate cosine similarity between user profile and all articles
         # cosine_similarity returns a shape of (1, n_samples)
