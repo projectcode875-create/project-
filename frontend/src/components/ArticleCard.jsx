@@ -1,11 +1,17 @@
 import React from "react";
 
-const ArticleCard = ({ article, onClick, isRead }) => {
+const ArticleCard = ({ article, onClick, isRead, onReadMore }) => {
   const handleCardClick = (e) => {
-    // Don't mark as read if clicking the external link
-    if (e.target.tagName !== "A") {
+    // Don't mark as read if clicking the external link or read more button
+    if (e.target.tagName !== "A" && !e.target.classList.contains('read-more-btn')) {
       onClick(article.id);
     }
+  };
+
+  const handleReadMore = (e) => {
+    e.stopPropagation();
+    onClick(article.id); // Mark as read
+    onReadMore(article); // Open full content
   };
 
   return (
@@ -32,7 +38,15 @@ const ArticleCard = ({ article, onClick, isRead }) => {
             article.title
           )}
         </h3>
-        <p className="card-content">{article.content}</p>
+        <p className="card-content">
+          {article.content.substring(0, 150)}...
+        </p>
+        <button 
+          className="read-more-btn" 
+          onClick={handleReadMore}
+        >
+          Read Full Article
+        </button>
       </div>
       {isRead && <span className="read-badge">Read</span>}
     </div>
